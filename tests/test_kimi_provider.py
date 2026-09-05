@@ -73,6 +73,25 @@ class TestKimiProvider:
     def test_custom_base_url(self):
         assert KimiModelProvider("test-key").base_url == "https://example.test/v1"
 
+    @patch.dict("os.environ", {"KIMI_BASE_URL": "https://api.moonshot.ai/v1"})
+    def test_explicit_base_url_overrides_kimi_code_key_detection(self):
+        provider = KimiModelProvider("sk-kimi-test-key")
+
+        assert provider.base_url == "https://api.moonshot.ai/v1"
+        assert provider._api_model_name("kimi-k3") == "kimi-k3"
+
+    def test_kimi_code_key_selects_subscription_endpoint(self):
+        provider = KimiModelProvider("sk-kimi-test-key")
+
+        assert provider.base_url == "https://api.kimi.com/coding/v1"
+        assert provider._api_model_name("kimi-k3") == "k3"
+
+    def test_open_platform_key_keeps_international_endpoint_and_model_id(self):
+        provider = KimiModelProvider("sk-open-platform-test-key")
+
+        assert provider.base_url == "https://api.moonshot.ai/v1"
+        assert provider._api_model_name("kimi-k3") == "kimi-k3"
+
     @pytest.mark.parametrize(
         ("thinking_mode", "expected"),
         [
@@ -85,7 +104,7 @@ class TestKimiProvider:
         ],
     )
     def test_reasoning_effort_mapping_and_fixed_sampling(self, thinking_mode, expected):
-        provider = KimiModelProvider("test-key")
+        provider = KimiModelProvider("sk-kimi-test-key")
         provider._client = MagicMock()
         message = SimpleNamespace(content="done", reasoning_content="private reasoning", tool_calls=None)
         provider._client.chat.completions.create.return_value = _response(message)
@@ -102,7 +121,7 @@ class TestKimiProvider:
         )
 
         params = provider._client.chat.completions.create.call_args.kwargs
-        assert params["model"] == "kimi-k3"
+        assert params["model"] == "k3"
         assert params["extra_body"] == {
             "reasoning_effort": expected,
             "max_completion_tokens": 4096,

@@ -20,7 +20,8 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Open `.env` in an editor and set:
+Create a pay-as-you-go key in the Kimi API platform or a subscription key in
+the Kimi Code console. Then open `.env` in an editor and set:
 
 ```env
 KIMI_API_KEY=your_real_key
@@ -30,7 +31,9 @@ DEFAULT_MODEL=kimi-k3
 
 Do not commit `.env` or paste the key into chat. `MOONSHOT_API_KEY` can be used
 instead of `KIMI_API_KEY`. The default endpoint is
-`https://api.moonshot.ai/v1`; override it with `KIMI_BASE_URL` only when needed.
+`https://api.moonshot.ai/v1`. Kimi Code subscription keys beginning with
+`sk-kimi-` automatically use `https://api.kimi.com/coding/v1`; override the
+endpoint with `KIMI_BASE_URL` only when needed.
 
 ## 2. Connect the local server to Codex
 

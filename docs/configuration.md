@@ -40,7 +40,10 @@ XAI_API_KEY=your_xai_api_key_here
 
 # Moonshot Kimi API
 KIMI_API_KEY=your_kimi_api_key_here
-# Get from: https://platform.kimi.ai/
+# KIMI_BASE_URL is optional: sk-kimi-* subscription keys automatically use
+# https://api.kimi.com/coding/v1; other keys use https://api.moonshot.ai/v1.
+# Get pay-as-you-go keys from https://platform.kimi.ai/ or subscription keys
+# from https://www.kimi.com/code/console.
 # Optional endpoint override: KIMI_BASE_URL=https://api.moonshot.ai/v1
 ```
 

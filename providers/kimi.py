@@ -34,15 +34,31 @@ class KimiModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
     MODEL_CAPABILITIES: ClassVar[dict[str, ModelCapabilities]] = {}
     PRIMARY_MODEL = "kimi-k3"
     _SUPPORTED_REASONING_EFFORTS = {"low", "high", "max"}
+    _KIMI_CODE_KEY_PREFIX = "sk-kimi-"
+    _KIMI_CODE_BASE_URL = "https://api.kimi.com/coding/v1"
+    _OPEN_PLATFORM_BASE_URL = "https://api.moonshot.ai/v1"
 
     def __init__(self, api_key: str, **kwargs):
-        """Initialize the provider with the international Moonshot endpoint."""
+        """Initialize Kimi Code or Moonshot based on the key and overrides."""
 
         self._ensure_registry()
-        base_url = get_env("KIMI_BASE_URL") or get_env("MOONSHOT_BASE_URL") or "https://api.moonshot.ai/v1"
+        base_url = get_env("KIMI_BASE_URL") or get_env("MOONSHOT_BASE_URL")
+        if not base_url:
+            base_url = (
+                self._KIMI_CODE_BASE_URL
+                if api_key.startswith(self._KIMI_CODE_KEY_PREFIX)
+                else self._OPEN_PLATFORM_BASE_URL
+            )
         kwargs.setdefault("base_url", base_url)
         super().__init__(api_key, **kwargs)
         self._invalidate_capability_cache()
+
+    def _api_model_name(self, resolved_model: str) -> str:
+        """Translate PAL's display-oriented K3 name to Kimi Code's API ID."""
+
+        if resolved_model == self.PRIMARY_MODEL and "api.kimi.com/coding" in self.base_url.rstrip("/"):
+            return "k3"
+        return resolved_model
 
     def get_provider_type(self) -> ProviderType:
         """Return the native Kimi provider type."""
@@ -141,6 +157,7 @@ class KimiModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
 
         capabilities = self.get_capabilities(model_name)
         resolved_model = self._resolve_model_name(model_name)
+        api_model = self._api_model_name(resolved_model)
         prior_messages = kwargs.pop("conversation_messages", None)
         thinking_mode = kwargs.pop("thinking_mode", None)
 
@@ -167,7 +184,7 @@ class KimiModelProvider(RegistryBackedProviderMixin, OpenAICompatibleProvider):
         # K3 fixes temperature/top_p/penalty values server-side. Deliberately
         # omit all sampling parameters instead of forwarding PAL defaults.
         completion_params = {
-            "model": resolved_model,
+            "model": api_model,
             "messages": messages,
             "stream": False,
             "extra_body": extra_body,
