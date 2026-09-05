@@ -4,6 +4,17 @@ This file contains essential commands and workflows for developing and maintaini
 
 ## Quick Reference Commands
 
+### Codex Plugin Distribution
+
+This fork ships its Codex integration as the marketplace-backed plugin in
+`plugins/pal`, with the catalog entry in `.agents/plugins/marketplace.json`.
+Keep the plugin manifest, MCP launcher, bundled `$pal` skill, and
+`docs/kimi-codex-setup.md` aligned when changing the Codex integration.
+
+Codex users should install the plugin instead of creating a standalone
+`codex mcp add pal` entry. Verification prompts must invoke `$pal` explicitly
+so Codex loads the bundled safety and review workflow before calling Kimi.
+
 ### Code Quality Checks
 
 Before making any changes or submitting PRs, always run the comprehensive quality checks:

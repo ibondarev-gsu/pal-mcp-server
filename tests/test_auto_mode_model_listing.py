@@ -110,7 +110,16 @@ def test_error_listing_respects_env_restrictions(monkeypatch, reset_registry):
     ):
         monkeypatch.setenv(key, value)
 
-    for var in ("XAI_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_KEY", "DIAL_API_KEY"):
+    for var in (
+        "XAI_API_KEY",
+        "KIMI_API_KEY",
+        "MOONSHOT_API_KEY",
+        "KIMI_ALLOWED_MODELS",
+        "KIMI_BASE_URL",
+        "CUSTOM_API_URL",
+        "CUSTOM_API_KEY",
+        "DIAL_API_KEY",
+    ):
         monkeypatch.delenv(var, raising=False)
     for azure_var in (
         "AZURE_OPENAI_API_KEY",
@@ -172,6 +181,7 @@ def test_error_listing_without_restrictions_shows_full_catalog(monkeypatch, rese
         "OPENAI_ALLOWED_MODELS",
         "OPENROUTER_ALLOWED_MODELS",
         "XAI_ALLOWED_MODELS",
+        "KIMI_ALLOWED_MODELS",
         "DIAL_ALLOWED_MODELS",
     ):
         monkeypatch.delenv(var, raising=False)
@@ -199,6 +209,10 @@ def test_error_listing_without_restrictions_shows_full_catalog(monkeypatch, rese
         "OPENAI_ALLOWED_MODELS",
         "OPENROUTER_ALLOWED_MODELS",
         "XAI_ALLOWED_MODELS",
+        "KIMI_API_KEY",
+        "MOONSHOT_API_KEY",
+        "KIMI_ALLOWED_MODELS",
+        "KIMI_BASE_URL",
         "DIAL_ALLOWED_MODELS",
         "CUSTOM_API_URL",
         "CUSTOM_API_KEY",

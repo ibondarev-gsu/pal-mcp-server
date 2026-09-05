@@ -22,6 +22,7 @@ from config import TEMPERATURE_BALANCED
 from systemprompts import CHAT_PROMPT, GENERATE_CODE_PROMPT
 from tools.shared.base_models import COMMON_FIELD_DESCRIPTIONS, ToolRequest
 
+from .chat_widget import get_chat_widget_tool_meta
 from .simple.base import SimpleTool
 
 # Field descriptions matching the original Chat tool exactly
@@ -82,6 +83,11 @@ class ChatTool(SimpleTool):
         """Chat writes generated artifacts when code-generation is enabled."""
 
         return {"readOnlyHint": False}
+
+    def get_meta(self) -> Optional[dict[str, Any]]:
+        """Attach the external-model response widget to chat calls."""
+
+        return get_chat_widget_tool_meta()
 
     def get_system_prompt(self) -> str:
         return CHAT_PROMPT

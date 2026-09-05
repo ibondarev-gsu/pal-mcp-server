@@ -30,13 +30,17 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mcp.server import Server  # noqa: E402
+from mcp.server.lowlevel.helper_types import ReadResourceContents  # noqa: E402
 from mcp.server.models import InitializationOptions  # noqa: E402
 from mcp.server.stdio import stdio_server  # noqa: E402
 from mcp.types import (  # noqa: E402
+    CallToolResult,
     GetPromptResult,
     Prompt,
     PromptMessage,
     PromptsCapability,
+    Resource,
+    ResourcesCapability,
     ServerCapabilities,
     TextContent,
     Tool,
@@ -67,6 +71,13 @@ from tools import (  # noqa: E402
     ThinkDeepTool,
     TracerTool,
     VersionTool,
+)
+from tools.chat_widget import (  # noqa: E402
+    CHAT_WIDGET_HTML,
+    CHAT_WIDGET_MIME_TYPE,
+    CHAT_WIDGET_URI,
+    build_chat_call_result,
+    get_chat_widget_resource_meta,
 )
 from tools.models import ToolOutput  # noqa: E402
 from tools.shared.exceptions import ToolExecutionError  # noqa: E402
@@ -708,6 +719,7 @@ async def handle_list_tools() -> list[Tool]:
                 description=tool.description,
                 inputSchema=tool.get_input_schema(),
                 annotations=tool_annotations,
+                _meta=tool.get_meta(),
             )
         )
 
@@ -720,8 +732,39 @@ async def handle_list_tools() -> list[Tool]:
     return tools
 
 
+@server.list_resources()
+async def handle_list_resources() -> list[Resource]:
+    """Advertise the MCP Apps resource used to render PAL chat results."""
+
+    return [
+        Resource(
+            name="PAL external model response",
+            title="PAL external model response",
+            uri=CHAT_WIDGET_URI,
+            description="Inline UI for the response returned by the PAL chat tool.",
+            mimeType=CHAT_WIDGET_MIME_TYPE,
+            _meta=get_chat_widget_resource_meta(),
+        )
+    ]
+
+
+@server.read_resource()
+async def handle_read_resource(uri) -> list[ReadResourceContents]:
+    """Return the self-contained PAL chat widget for compatible MCP Apps hosts."""
+
+    if str(uri) != CHAT_WIDGET_URI:
+        raise ValueError(f"Unknown resource: {uri}")
+    return [
+        ReadResourceContents(
+            content=CHAT_WIDGET_HTML,
+            mime_type=CHAT_WIDGET_MIME_TYPE,
+            meta=get_chat_widget_resource_meta(),
+        )
+    ]
+
+
 @server.call_tool()
-async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """
     Handle incoming tool execution requests from MCP clients.
 
@@ -902,6 +945,8 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             mcp_activity_logger.info(f"TOOL_COMPLETED: {name}")
         except Exception:
             pass
+        if name == "chat":
+            return build_chat_call_result(result)
         return result
 
     # Handle unknown tool requests gracefully
@@ -1568,6 +1613,7 @@ async def main():
                 capabilities=ServerCapabilities(
                     tools=ToolsCapability(),  # Advertise tool support capability
                     prompts=PromptsCapability(),  # Advertise prompt support capability
+                    resources=ResourcesCapability(),  # Advertise MCP Apps UI resources
                 ),
             ),
         )
