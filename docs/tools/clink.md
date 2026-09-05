@@ -52,7 +52,7 @@ Gemini receives the full conversation context from `consensus` including the con
 - **Full conversation continuity**: Gemini's responses participate in the same conversation thread
 - **Role-based prompts**: Pre-configured roles for planning, code review, or general questions
 - **Full CLI capabilities**: Gemini can use its own web search, file tools, and latest features
-- **Repository-aware Kimi review**: the `kimi` preset runs Kimi K3 through Claude Code with read-only `Read`, `Glob`, and `Grep` tools
+- **Repository-aware Kimi review**: the `kimi` preset runs Kimi K2.7 Code through Claude Code with read-only `Read`, `Glob`, and `Grep` tools
 - **Token efficiency**: File references (not full content) to conserve tokens
 - **Cross-tool collaboration**: Combine with other PAL tools like `planner` → `clink` → `codereview`
 - **Free tier available**: Gemini offers 1,000 requests/day free with a personal Google account - great for cost savings across tools
@@ -140,7 +140,7 @@ then codereview to verify the implementation"
 
 Clink configurations live in `conf/cli_clients/`. We ship presets for the supported CLIs:
 
-- `kimi.json` – runs Claude Code against Kimi Code's Anthropic-compatible endpoint with read-only repository tools
+- `kimi.json` – runs Claude Code with Kimi K2.7 Code (`kimi-for-coding`) against Kimi Code's Anthropic-compatible endpoint with read-only repository tools
 - `gemini.json` – runs `gemini --telemetry false --yolo -o json`
 - `claude.json` – runs `claude --print --output-format json --permission-mode acceptEdits --model sonnet`
 - `codex.json` – runs `codex exec --json --dangerously-bypass-approvals-and-sandbox`

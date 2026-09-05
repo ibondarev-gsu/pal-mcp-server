@@ -68,14 +68,14 @@ def test_external_model_widget_uses_cli_name_for_clink_provider():
     payload = {
         "status": "success",
         "content": "Repository review complete.",
-        "metadata": {"cli_name": "kimi", "model_used": "k3-256k"},
+        "metadata": {"cli_name": "kimi", "model_used": "kimi-for-coding"},
     }
     original = TextContent(type="text", text=json.dumps(payload))
 
     result = build_chat_call_result([original])
 
     assert result.structuredContent["provider"] == "kimi"
-    assert result.structuredContent["model"] == "k3-256k"
+    assert result.structuredContent["model"] == "kimi-for-coding"
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_clink_server_dispatch_adds_widget_structured_content(monkeypatch)
         "status": "success",
         "content": "Repository review complete.",
         "content_type": "text",
-        "metadata": {"cli_name": "kimi", "model_used": "k3-256k"},
+        "metadata": {"cli_name": "kimi", "model_used": "kimi-for-coding"},
     }
 
     async def fake_execute(_arguments):
