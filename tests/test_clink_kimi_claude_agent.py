@@ -39,7 +39,7 @@ async def test_kimi_agent_routes_claude_to_kimi_without_leaking_key(monkeypatch,
                 "subtype": "success",
                 "is_error": False,
                 "result": "No blockers.",
-                "modelUsage": {"k3-256k": {"inputTokens": 10, "outputTokens": 3}},
+                "modelUsage": {"kimi-for-coding": {"inputTokens": 10, "outputTokens": 3}},
             }
         ).encode()
     )
@@ -84,7 +84,7 @@ async def test_kimi_agent_routes_claude_to_kimi_without_leaking_key(monkeypatch,
     assert "--permission-mode" in result.sanitized_command
     assert "--append-system-prompt" in result.sanitized_command
     assert result.parsed.content == "No blockers."
-    assert result.parsed.metadata["model_used"] == "k3-256k"
+    assert result.parsed.metadata["model_used"] == "kimi-for-coding"
     assert os.environ["ANTHROPIC_CUSTOM_HEADERS"] == "x-corporate-token: secret"
     assert os.environ["CLAUDE_CODE_UNRELATED_SETTING"] == "user-value"
 

@@ -1,8 +1,8 @@
 interface:
   display_name: "PAL + Kimi"
-  short_description: "Independent review through Kimi K3"
+  short_description: "Independent review through Kimi K2.7 Code"
   brand_color: "#6657D9"
-  default_prompt: "Use $pal to review this change with Kimi K3."
+  default_prompt: "Use $pal to review this change with Kimi K2.7 Code."
 
 policy:
   allow_implicit_invocation: true

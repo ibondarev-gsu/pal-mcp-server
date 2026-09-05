@@ -1,10 +1,10 @@
-# Kimi K3 in Codex: install the PAL plugin
+# Kimi K2.7 Code in Codex: install the PAL plugin
 
 The Codex plugin is the supported setup for this fork. It installs the PAL MCP
 tools and the `$pal` skill together, so a new computer does not need a manual
 checkout, virtual environment, or separate `codex mcp add` entry.
 
-Codex remains the primary agent. PAL calls Kimi K3 as an independent reviewer.
+Codex remains the primary agent. PAL calls Kimi K2.7 Code as an independent reviewer.
 
 ## Prerequisites
 
@@ -57,8 +57,6 @@ Open the installed plugin's PAL MCP settings in Codex and provide:
 ```env
 KIMI_API_KEY=your_real_key
 KIMI_CLAUDE_API_KEY=your_kimi_code_console_key
-KIMI_ALLOWED_MODELS=kimi-k3
-DEFAULT_MODEL=kimi-k3
 ```
 
 `MOONSHOT_API_KEY` can be used instead of `KIMI_API_KEY`. The default endpoint
@@ -73,8 +71,8 @@ If `KIMI_CLAUDE_API_KEY` is omitted, the client falls back to `KIMI_API_KEY`.
 That fallback works only when the latter is also a Kimi Code key.
 
 The bundled client follows Kimi's official Claude Code configuration:
-`ANTHROPIC_BASE_URL=https://api.kimi.com/coding/`, model `k3-256k`, high effort,
-and a 262144-token context. It launches Claude Code with `--bare`, disables
+`ANTHROPIC_BASE_URL=https://api.kimi.com/coding/`, model `kimi-for-coding`
+(Kimi K2.7 Code), thinking enabled, and a 262144-token context. It launches Claude Code with `--bare`, disables
 global/project/local settings for that child process, uses plan permissions,
 and enables only `Read`, `Glob`, and `Grep`. It can inspect a repository but
 cannot edit files or run shell commands, and it does not disturb another
@@ -86,13 +84,15 @@ task. Existing tasks keep the skill and tool inventory they started with.
 ## 4. Use the bundled skill
 
 Invoke `$pal` explicitly whenever Kimi should participate. The skill selects
-`kimi-k3`, routes the request to the narrowest PAL tool, and requires Codex to
-verify the external model's findings.
+the `clink` client named `kimi`, which uses `kimi-for-coding`, and requires
+Codex to verify the external model's findings. It does not select the direct
+`kimi-k3` model unless the user explicitly asks for K3.
 
 Start with this smoke test:
 
 ```text
-Use $pal. Call pal.chat through Kimi and ask it to reply exactly: PAL_UI_OK
+Use $pal. Call pal.clink with cli_name=kimi, role=default, and the absolute
+repository path. Ask it to reply exactly: PAL_UI_OK
 ```
 
 Then verify repository-aware review in a trusted checkout:
@@ -105,12 +105,16 @@ repository path. Ask Kimi to inspect naming, duplication, and package placement.
 Useful examples:
 
 ```text
-$pal review this diff with Kimi K3 and verify every finding locally
+$pal review this diff with Kimi K2.7 Code and verify every finding locally
 
 $pal challenge this implementation plan, focusing on concurrency and rollback
 
-$pal debug this failure with Kimi K3
+$pal debug this failure with Kimi K2.7 Code
 ```
+
+Start a new Kimi session after switching model IDs. Kimi documents that model
+switches invalidate the existing context cache and can temporarily increase
+usage by re-prefilling the prior context.
 
 Kimi is an external provider. Do not send secrets, customer data, production
 data, or private organization source code unless sharing that material with
