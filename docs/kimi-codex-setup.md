@@ -10,7 +10,7 @@ Install Git, Python 3.12+, [uv](https://docs.astral.sh/uv/), and Codex first.
 Then run:
 
 ```bash
-git clone --branch feat/kimi-k3-provider --single-branch \
+git clone --branch main --single-branch \
   https://github.com/ibondarev-gsu/pal-mcp-server.git
 cd pal-mcp-server
 
