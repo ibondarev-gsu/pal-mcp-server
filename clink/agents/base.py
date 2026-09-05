@@ -47,6 +47,9 @@ class CLIAgentError(RuntimeError):
 class BaseCLIAgent:
     """Execute a configured CLI command and parse its output."""
 
+    injects_system_prompt_externally = False
+    requires_explicit_working_dir = False
+
     def __init__(self, client: ResolvedCLIClient):
         self.client = client
         self._parser: BaseParser = get_parser(client.parser)
@@ -60,6 +63,7 @@ class BaseCLIAgent:
         system_prompt: str | None = None,
         files: Sequence[str],
         images: Sequence[str],
+        working_dir: Path | None = None,
     ) -> AgentOutput:
         # Files and images are already embedded into the prompt by the tool; they are
         # accepted here only to keep parity with SimpleTool callers.
@@ -78,9 +82,10 @@ class BaseCLIAgent:
             )
         command[0] = resolved_executable
 
-        sanitized_command = list(command)
+        sanitized_command = self._sanitize_command(command)
 
-        cwd = str(self.client.working_dir) if self.client.working_dir else None
+        effective_working_dir = working_dir or self.client.working_dir
+        cwd = str(effective_working_dir) if effective_working_dir else None
         limit = DEFAULT_STREAM_LIMIT
 
         stdout_text = ""
@@ -101,7 +106,7 @@ class BaseCLIAgent:
             except KeyError as exc:  # pragma: no cover - defensive
                 raise CLIAgentError(f"Invalid output flag template '{flag_template}': missing placeholder {exc}")
             command_with_output_flag.extend(shlex.split(rendered_flag))
-            sanitized_command = list(command_with_output_flag)
+            sanitized_command = self._sanitize_command(command_with_output_flag)
 
         self._logger.debug("Executing CLI command: %s", " ".join(sanitized_command))
         if cwd:
@@ -132,6 +137,10 @@ class BaseCLIAgent:
                 f"CLI '{self.client.name}' timed out after {self.client.timeout_seconds} seconds",
                 returncode=None,
             ) from exc
+        except asyncio.CancelledError:
+            process.kill()
+            await process.communicate()
+            raise
 
         duration = time.monotonic() - start_time
         return_code = process.returncode
@@ -202,6 +211,9 @@ class BaseCLIAgent:
         env = os.environ.copy()
         env.update(self.client.env)
         return env
+
+    def _sanitize_command(self, command: Sequence[str]) -> list[str]:
+        return list(command)
 
     # ------------------------------------------------------------------
     # Error recovery hooks

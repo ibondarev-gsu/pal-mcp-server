@@ -78,7 +78,7 @@ async def test_claude_agent_injects_system_prompt(monkeypatch, claude_agent):
 
     assert "--append-system-prompt" in result.sanitized_command
     idx = result.sanitized_command.index("--append-system-prompt")
-    assert result.sanitized_command[idx + 1] == "System prompt"
+    assert result.sanitized_command[idx + 1] == "[system prompt: 13 chars]"
     assert process.stdin_data.decode().startswith("Respond with 42")
 
 

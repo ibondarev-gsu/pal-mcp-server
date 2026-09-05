@@ -734,7 +734,7 @@ async def handle_list_tools() -> list[Tool]:
 
 @server.list_resources()
 async def handle_list_resources() -> list[Resource]:
-    """Advertise the MCP Apps resource used to render PAL chat results."""
+    """Advertise the MCP Apps resource used to render PAL external-model results."""
 
     return [
         Resource(
@@ -750,7 +750,7 @@ async def handle_list_resources() -> list[Resource]:
 
 @server.read_resource()
 async def handle_read_resource(uri) -> list[ReadResourceContents]:
-    """Return the self-contained PAL chat widget for compatible MCP Apps hosts."""
+    """Return the self-contained PAL result widget for compatible MCP Apps hosts."""
 
     if str(uri) != CHAT_WIDGET_URI:
         raise ValueError(f"Unknown resource: {uri}")
@@ -881,7 +881,10 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         if not tool.requires_model():
             logger.debug(f"Tool {name} doesn't require model resolution - skipping model validation")
             # Execute tool directly without model context
-            return await tool.execute(arguments)
+            result = await tool.execute(arguments)
+            if name in {"chat", "clink"}:
+                return build_chat_call_result(result)
+            return result
 
         # Handle auto mode at MCP boundary - resolve to specific model
         if model_name.lower() == "auto":
@@ -945,7 +948,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             mcp_activity_logger.info(f"TOOL_COMPLETED: {name}")
         except Exception:
             pass
-        if name == "chat":
+        if name in {"chat", "clink"}:
             return build_chat_call_result(result)
         return result
 

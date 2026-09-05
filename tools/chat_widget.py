@@ -1,4 +1,4 @@
-"""MCP Apps UI resource and structured output helpers for the chat tool."""
+"""MCP Apps UI resource and structured output helpers for external-model tools."""
 
 import json
 from collections.abc import Iterable
@@ -26,7 +26,7 @@ def get_chat_widget_resource_meta() -> dict[str, Any]:
 
     return {
         "ui": {"prefersBorder": True},
-        "openai/widgetDescription": "Shows the external model response returned by PAL chat.",
+        "openai/widgetDescription": "Shows the external model response returned by PAL chat or clink.",
         "openai/widgetPrefersBorder": True,
     }
 
@@ -54,7 +54,7 @@ def _parse_tool_output(content: Iterable[Any]) -> dict[str, Any] | None:
 
 
 def build_chat_call_result(content: list[Any]) -> CallToolResult:
-    """Add structured data for the widget while preserving legacy TextContent."""
+    """Add structured data for the external-model widget while preserving TextContent."""
 
     payload = _parse_tool_output(content)
     if payload is None:
@@ -68,7 +68,7 @@ def build_chat_call_result(content: list[Any]) -> CallToolResult:
         "status": payload.get("status", "success"),
         "answer": _visible_model_answer(answer),
         "contentType": payload.get("content_type", "text"),
-        "provider": metadata.get("provider_used"),
+        "provider": metadata.get("provider_used") or metadata.get("cli_name"),
         "model": metadata.get("model_used"),
         "continuationId": continuation.get("continuation_id"),
         "remainingTurns": continuation.get("remaining_turns"),
@@ -320,7 +320,7 @@ CHAT_WIDGET_HTML = r"""<!doctype html>
     function renderInput(raw) {
       const data = raw?.arguments || raw || {};
       if (!data || typeof data !== "object") return;
-      const model = String(data.model || "внешняя модель");
+      const model = String(data.model || data.cli_name || "внешняя модель");
       subtitle.textContent = model.toLowerCase().startsWith("kimi") ? `Kimi · ${model}` : model;
       statusText.textContent = "Анализирует…";
     }

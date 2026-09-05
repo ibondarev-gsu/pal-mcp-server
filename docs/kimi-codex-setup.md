@@ -11,6 +11,7 @@ Codex remains the primary agent. PAL calls Kimi K3 as an independent reviewer.
 Install:
 
 - [Codex](https://developers.openai.com/codex/)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code/getting-started) for repository-aware Kimi agent reviews
 - Git
 - [uv](https://docs.astral.sh/uv/getting-started/installation/), which provides `uvx`
 
@@ -55,6 +56,7 @@ Open the installed plugin's PAL MCP settings in Codex and provide:
 
 ```env
 KIMI_API_KEY=your_real_key
+KIMI_CLAUDE_API_KEY=your_kimi_code_console_key
 KIMI_ALLOWED_MODELS=kimi-k3
 DEFAULT_MODEL=kimi-k3
 ```
@@ -63,6 +65,20 @@ DEFAULT_MODEL=kimi-k3
 is `https://api.moonshot.ai/v1`. Subscription keys beginning with `sk-kimi-`
 automatically use `https://api.kimi.com/coding/v1`; set `KIMI_BASE_URL` only
 when an explicit override is required.
+
+`KIMI_CLAUDE_API_KEY` is used only by the `clink` client named `kimi`. It must
+be a key from the Kimi Code Console. PAL passes it to the child Claude Code
+process as `ANTHROPIC_API_KEY` without writing it to Claude's global settings.
+If `KIMI_CLAUDE_API_KEY` is omitted, the client falls back to `KIMI_API_KEY`.
+That fallback works only when the latter is also a Kimi Code key.
+
+The bundled client follows Kimi's official Claude Code configuration:
+`ANTHROPIC_BASE_URL=https://api.kimi.com/coding/`, model `k3-256k`, high effort,
+and a 262144-token context. It launches Claude Code with `--bare`, disables
+global/project/local settings for that child process, uses plan permissions,
+and enables only `Read`, `Glob`, and `Grep`. It can inspect a repository but
+cannot edit files or run shell commands, and it does not disturb another
+provider configured in the user's normal Claude settings.
 
 After installation or configuration changes, fully quit Codex and start a new
 task. Existing tasks keep the skill and tool inventory they started with.
@@ -77,6 +93,13 @@ Start with this smoke test:
 
 ```text
 Use $pal. Call pal.chat through Kimi and ask it to reply exactly: PAL_UI_OK
+```
+
+Then verify repository-aware review in a trusted checkout:
+
+```text
+Use $pal. Call pal.clink with cli_name=kimi, role=codereviewer, and the absolute
+repository path. Ask Kimi to inspect naming, duplication, and package placement.
 ```
 
 Useful examples:
@@ -95,9 +118,9 @@ Kimi has been explicitly approved.
 
 ## UI behavior
 
-`pal.chat` exposes an MCP Apps result card with the provider, model, answer,
-continuation ID, and copy action. Other PAL tools currently return their normal
-text result.
+`pal.chat` and `pal.clink` expose an MCP Apps result card with the provider,
+model, answer, continuation ID, and copy action. Other PAL tools return their
+normal text result.
 
 If the card or `$pal` is missing:
 

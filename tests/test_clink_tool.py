@@ -3,14 +3,17 @@ import json
 import pytest
 
 from clink import get_registry
-from clink.agents import AgentOutput
+from clink.agents import AgentOutput, create_agent
+from clink.agents.kimi_claude import KimiClaudeAgent
 from clink.parsers.base import ParsedCLIResponse
 from tools.clink import MAX_RESPONSE_CHARS, CLinkTool
+from tools.shared.exceptions import ToolExecutionError
 
 
 @pytest.mark.asyncio
-async def test_clink_tool_execute(monkeypatch):
+async def test_clink_tool_execute(monkeypatch, tmp_path):
     tool = CLinkTool()
+    invocation = {}
 
     async def fake_run(**kwargs):
         return AgentOutput(
@@ -25,7 +28,11 @@ async def test_clink_tool_execute(monkeypatch):
         )
 
     class DummyAgent:
+        injects_system_prompt_externally = False
+        requires_explicit_working_dir = False
+
         async def run(self, **kwargs):
+            invocation.update(kwargs)
             return await fake_run(**kwargs)
 
     def fake_create_agent(client):
@@ -39,6 +46,7 @@ async def test_clink_tool_execute(monkeypatch):
         "role": "default",
         "absolute_file_paths": [],
         "images": [],
+        "working_directory_absolute_path": str(tmp_path),
     }
 
     results = await tool.execute(arguments)
@@ -50,15 +58,17 @@ async def test_clink_tool_execute(monkeypatch):
     metadata = payload.get("metadata", {})
     assert metadata.get("cli_name") == "gemini"
     assert metadata.get("command") == ["gemini", "-o", "json"]
+    assert invocation["working_dir"] == tmp_path.resolve()
 
 
 def test_registry_lists_roles():
     registry = get_registry()
     clients = registry.list_clients()
-    assert {"codex", "gemini"}.issubset(set(clients))
+    assert {"codex", "gemini", "kimi"}.issubset(set(clients))
     roles = registry.list_roles("gemini")
     assert "default" in roles
     assert "default" in registry.list_roles("codex")
+    assert "codereviewer" in registry.list_roles("kimi")
     codex_client = registry.get_client("codex")
     # Verify codex uses --enable web_search_request (not --search which is unsupported by exec)
     assert codex_client.config_args == [
@@ -67,6 +77,45 @@ def test_registry_lists_roles():
         "--enable",
         "web_search_request",
     ]
+    kimi_client = registry.get_client("kimi")
+    assert kimi_client.executable == ["claude"]
+    assert kimi_client.runner == "kimi_claude"
+    assert kimi_client.timeout_seconds == 1100
+    assert kimi_client.config_args == [
+        "--bare",
+        "--setting-sources",
+        "",
+        "--permission-mode",
+        "plan",
+        "--tools",
+        "Read,Glob,Grep",
+        "--model",
+        "k3-256k",
+        "--effort",
+        "high",
+        "--no-session-persistence",
+    ]
+    assert kimi_client.env == {
+        "ANTHROPIC_BASE_URL": "https://api.kimi.com/coding/",
+        "ANTHROPIC_MODEL": "k3-256k",
+        "ANTHROPIC_DEFAULT_FABLE_MODEL": "k3-256k",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "k3-256k",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "k3-256k",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "k3-256k",
+        "CLAUDE_CODE_SUBAGENT_MODEL": "k3-256k",
+        "CLAUDE_CODE_EFFORT_LEVEL": "high",
+        "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "262144",
+        "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "262144",
+    }
+    assert isinstance(create_agent(kimi_client), KimiClaudeAgent)
+
+
+@pytest.mark.asyncio
+async def test_kimi_requires_explicit_working_directory():
+    tool = CLinkTool()
+
+    with pytest.raises(ToolExecutionError, match="requires 'working_directory_absolute_path'"):
+        await tool.execute({"prompt": "Review this repository", "cli_name": "kimi", "role": "codereviewer"})
 
 
 @pytest.mark.asyncio
@@ -86,6 +135,9 @@ async def test_clink_tool_defaults_to_first_cli(monkeypatch):
         )
 
     class DummyAgent:
+        injects_system_prompt_externally = False
+        requires_explicit_working_dir = False
+
         async def run(self, **kwargs):
             return await fake_run(**kwargs)
 
@@ -124,6 +176,9 @@ async def test_clink_tool_truncates_large_output(monkeypatch):
         )
 
     class DummyAgent:
+        injects_system_prompt_externally = False
+        requires_explicit_working_dir = False
+
         async def run(self, **kwargs):
             return await fake_run(**kwargs)
 
@@ -165,6 +220,9 @@ async def test_clink_tool_truncates_without_summary(monkeypatch):
         )
 
     class DummyAgent:
+        injects_system_prompt_externally = False
+        requires_explicit_working_dir = False
+
         async def run(self, **kwargs):
             return await fake_run(**kwargs)
 

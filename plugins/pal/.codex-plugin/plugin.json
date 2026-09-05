@@ -1,6 +1,6 @@
 {
   "name": "pal",
-  "version": "0.1.0",
+  "version": "0.1.0+codex.20260905202329",
   "description": "Use PAL with Kimi K3 as an independent software-development reviewer in Codex.",
   "author": {
     "name": "ibondarev-gsu",
