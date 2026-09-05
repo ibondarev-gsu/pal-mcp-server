@@ -40,6 +40,7 @@ class ModelProviderRegistry:
         ProviderType.OPENAI,  # Direct OpenAI access
         ProviderType.AZURE,  # Azure-hosted OpenAI deployments
         ProviderType.XAI,  # Direct X.AI GROK access
+        ProviderType.KIMI,  # Direct Moonshot Kimi access
         ProviderType.DIAL,  # DIAL unified API access
         ProviderType.CUSTOM,  # Local/self-hosted models
         ProviderType.OPENROUTER,  # Catch-all for cloud models
@@ -336,10 +337,20 @@ class ModelProviderRegistry:
             ProviderType.OPENAI: "OPENAI_API_KEY",
             ProviderType.AZURE: "AZURE_OPENAI_API_KEY",
             ProviderType.XAI: "XAI_API_KEY",
+            ProviderType.KIMI: "KIMI_API_KEY",
             ProviderType.OPENROUTER: "OPENROUTER_API_KEY",
             ProviderType.CUSTOM: "CUSTOM_API_KEY",  # Can be empty for providers that don't need auth
             ProviderType.DIAL: "DIAL_API_KEY",
         }
+
+        if provider_type == ProviderType.KIMI:
+            kimi_key = get_env("KIMI_API_KEY")
+            if kimi_key and kimi_key != "your_kimi_api_key_here":
+                return kimi_key
+            moonshot_key = get_env("MOONSHOT_API_KEY")
+            if moonshot_key and moonshot_key != "your_moonshot_api_key_here":
+                return moonshot_key
+            return None
 
         env_var = key_mapping.get(provider_type)
         if not env_var:

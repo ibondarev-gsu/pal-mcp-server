@@ -203,6 +203,17 @@ class ModelProvider(ABC):
 
         return
 
+    def build_continuation_messages(self, context: Any, model_name: str) -> Optional[list[dict[str, Any]]]:
+        """Return provider-native messages for a compatible conversation thread.
+
+        Most providers use PAL's portable text reconstruction and therefore
+        return ``None``. Providers whose APIs require exact assistant-message
+        replay can override this hook and reconstruct their native message
+        sequence from provider state stored on previous turns.
+        """
+
+        return None
+
     # ------------------------------------------------------------------
     # Retry helpers
     # ------------------------------------------------------------------

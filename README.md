@@ -202,6 +202,14 @@ cd pal-mcp-server
 
 PAL activates any provider that has credentials in your `.env`. See `.env.example` for deeper customization.
 
+For direct Kimi K3 access, set `KIMI_API_KEY` (or `MOONSHOT_API_KEY`) and select
+`kimi-k3`, `kimi`, or `k3`. The native integration preserves K3 reasoning and tool-call
+state across PAL continuations and maps PAL thinking modes to K3's `low`, `high`, and
+`max` reasoning levels.
+
+For a second-machine Codex installation, follow the
+[Kimi K3 quick setup](docs/kimi-codex-setup.md).
+
 ## Core Tools
 
 > **Note:** Each tool comes with its own multi-step workflow, parameters, and descriptions that consume valuable context window space even when not in use. To optimize performance, some tools are disabled by default. See [Tool Configuration](#tool-configuration) below to enable them.
@@ -278,6 +286,7 @@ DISABLED_TOOLS=
         // API configuration
         "GEMINI_API_KEY": "your-gemini-key",
         "OPENAI_API_KEY": "your-openai-key",
+        "KIMI_API_KEY": "your-kimi-key",
         "OPENROUTER_API_KEY": "your-openrouter-key",
         
         // Logging and performance

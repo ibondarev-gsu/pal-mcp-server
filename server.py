@@ -20,6 +20,7 @@ as defined by the MCP protocol.
 
 import asyncio
 import atexit
+import json
 import logging
 import os
 import sys
@@ -387,7 +388,15 @@ def configure_providers():
     """
     # Log environment variable status for debugging
     logger.debug("Checking environment variables for API keys...")
-    api_keys_to_check = ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "XAI_API_KEY", "CUSTOM_API_URL"]
+    api_keys_to_check = [
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
+        "XAI_API_KEY",
+        "KIMI_API_KEY",
+        "MOONSHOT_API_KEY",
+        "CUSTOM_API_URL",
+    ]
     for key in api_keys_to_check:
         value = get_env(key)
         logger.debug(f"  {key}: {'[PRESENT]' if value else '[MISSING]'}")
@@ -396,6 +405,7 @@ def configure_providers():
     from providers.custom import CustomProvider
     from providers.dial import DIALModelProvider
     from providers.gemini import GeminiModelProvider
+    from providers.kimi import KimiModelProvider
     from providers.openai import OpenAIModelProvider
     from providers.openrouter import OpenRouterProvider
     from providers.shared import ProviderType
@@ -455,6 +465,16 @@ def configure_providers():
         has_native_apis = True
         logger.info("X.AI API key found - GROK models available")
 
+    # Check for Moonshot Kimi API key. KIMI_API_KEY is preferred, while
+    # MOONSHOT_API_KEY keeps compatibility with Moonshot's naming.
+    kimi_key = get_env("KIMI_API_KEY")
+    if not kimi_key or kimi_key == "your_kimi_api_key_here":
+        kimi_key = get_env("MOONSHOT_API_KEY")
+    if kimi_key and kimi_key != "your_moonshot_api_key_here":
+        valid_providers.append("Moonshot Kimi")
+        has_native_apis = True
+        logger.info("Kimi API key found - Kimi models available")
+
     # Check for DIAL API key
     dial_key = get_env("DIAL_API_KEY")
     if dial_key and dial_key != "your_dial_api_key_here":
@@ -513,6 +533,10 @@ def configure_providers():
             ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
             registered_providers.append(ProviderType.XAI.value)
             logger.debug(f"Registered provider: {ProviderType.XAI.value}")
+        if kimi_key and kimi_key != "your_moonshot_api_key_here":
+            ModelProviderRegistry.register_provider(ProviderType.KIMI, KimiModelProvider)
+            registered_providers.append(ProviderType.KIMI.value)
+            logger.debug(f"Registered provider: {ProviderType.KIMI.value}")
         if dial_key and dial_key != "your_dial_api_key_here":
             ModelProviderRegistry.register_provider(ProviderType.DIAL, DIALModelProvider)
             registered_providers.append(ProviderType.DIAL.value)
@@ -547,6 +571,7 @@ def configure_providers():
             "- GEMINI_API_KEY for Gemini models\n"
             "- OPENAI_API_KEY for OpenAI models\n"
             "- XAI_API_KEY for X.AI GROK models\n"
+            "- KIMI_API_KEY (or MOONSHOT_API_KEY) for Moonshot Kimi models\n"
             "- DIAL_API_KEY for DIAL models\n"
             "- OPENROUTER_API_KEY for OpenRouter (multiple models)\n"
             "- CUSTOM_API_URL for local models (Ollama, vLLM, etc.)"
@@ -600,7 +625,13 @@ def configure_providers():
 
         # Validate restrictions against known models
         provider_instances = {}
-        provider_types_to_validate = [ProviderType.GOOGLE, ProviderType.OPENAI, ProviderType.XAI, ProviderType.DIAL]
+        provider_types_to_validate = [
+            ProviderType.GOOGLE,
+            ProviderType.OPENAI,
+            ProviderType.XAI,
+            ProviderType.KIMI,
+            ProviderType.DIAL,
+        ]
         for provider_type in provider_types_to_validate:
             provider = ModelProviderRegistry.get_provider(provider_type)
             if provider:
@@ -772,7 +803,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         except Exception:
             pass
 
-        arguments = await reconstruct_thread_context(arguments)
+        arguments = await reconstruct_thread_context(arguments, current_tool_name=name)
         logger.debug(f"[CONVERSATION_DEBUG] After thread reconstruction, arguments keys: {list(arguments.keys())}")
         if "_remaining_tokens" in arguments:
             logger.debug(f"[CONVERSATION_DEBUG] Remaining token budget: {arguments['_remaining_tokens']:,}")
@@ -965,7 +996,10 @@ Remember: Only suggest follow-ups when they would genuinely add value to the dis
 "The agent to use the continuation_id when you do."""
 
 
-async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any]:
+async def reconstruct_thread_context(
+    arguments: dict[str, Any],
+    current_tool_name: str | None = None,
+) -> dict[str, Any]:
     """
     Reconstruct conversation context for stateless-to-stateful thread continuation.
 
@@ -1019,6 +1053,8 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
         arguments: Original request arguments dictionary containing:
                   - continuation_id (required): UUID of conversation thread to resume
                   - Other tool-specific arguments that will be preserved
+        current_tool_name: Tool receiving the continuation. When omitted,
+                  the originating thread tool is used for compatibility.
 
     Returns:
         dict[str, Any]: Enhanced arguments dictionary with conversation context:
@@ -1095,7 +1131,7 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     # Create model context early to use for history building
     from utils.model_context import ModelContext
 
-    tool = TOOLS.get(context.tool_name)
+    tool = TOOLS.get(current_tool_name or context.tool_name)
     requires_model = tool.requires_model() if tool else True
 
     # Check if we should use the model from the previous conversation turn
@@ -1202,11 +1238,33 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
             arguments["_model_context"] = model_context
             arguments["_resolved_model_name"] = fallback_model
 
+    # Providers such as Kimi require exact protocol-level assistant message
+    # replay. Prefer their native history hook; retain PAL's text reconstruction
+    # as the universal fallback for cross-provider and legacy continuations.
+    provider = ModelProviderRegistry.get_provider_for_model(model_context.model_name)
+    supports_native_continuation = bool(tool and tool.requires_model() and tool.supports_provider_native_continuation())
+    provider_conversation_messages = None
+    if provider and supports_native_continuation:
+        provider_conversation_messages = provider.build_continuation_messages(context, model_context.model_name)
+
     # Build conversation history with model-specific limits
     logger.debug(f"[CONVERSATION_DEBUG] Building conversation history for thread {continuation_id}")
     logger.debug(f"[CONVERSATION_DEBUG] Thread has {len(context.turns)} turns, tool: {context.tool_name}")
     logger.debug(f"[CONVERSATION_DEBUG] Using model: {model_context.model_name}")
-    conversation_history, conversation_tokens = build_conversation_history(context, model_context)
+    if provider_conversation_messages:
+        conversation_history = ""
+        serialized_messages = json.dumps(
+            provider_conversation_messages,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        conversation_tokens = provider.count_tokens(serialized_messages, model_context.model_name)
+        logger.debug(
+            "[CONVERSATION_DEBUG] Using provider-native history with %d messages",
+            len(provider_conversation_messages),
+        )
+    else:
+        conversation_history, conversation_tokens = build_conversation_history(context, model_context)
     logger.debug(f"[CONVERSATION_DEBUG] Conversation history built: {conversation_tokens:,} tokens")
     logger.debug(
         f"[CONVERSATION_DEBUG] Conversation history length: {len(conversation_history)} chars (~{conversation_tokens:,} tokens)"
@@ -1239,6 +1297,8 @@ async def reconstruct_thread_context(arguments: dict[str, Any]) -> dict[str, Any
     enhanced_arguments["prompt"] = enhanced_prompt
     # Store the original user prompt separately for size validation
     enhanced_arguments["_original_user_prompt"] = original_prompt
+    if provider_conversation_messages:
+        enhanced_arguments["_provider_conversation_messages"] = provider_conversation_messages
     logger.debug("[CONVERSATION_DEBUG] Storing enhanced prompt in 'prompt' field")
     logger.debug("[CONVERSATION_DEBUG] Storing original user prompt in '_original_user_prompt' field")
 

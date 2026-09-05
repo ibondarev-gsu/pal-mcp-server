@@ -18,6 +18,7 @@ class ModelResponse:
     friendly_name: str = ""
     provider: ProviderType = ProviderType.GOOGLE
     metadata: dict[str, Any] = field(default_factory=dict)
+    provider_state: dict[str, Any] | None = None
 
     @property
     def total_tokens(self) -> int:

@@ -68,6 +68,8 @@ def check_environment():
         "GOOGLE_API_KEY",
         "OPENAI_API_KEY",
         "XAI_API_KEY",
+        "KIMI_API_KEY",
+        "MOONSHOT_API_KEY",
         "DIAL_API_KEY",
         "OPENROUTER_API_KEY",
     ]

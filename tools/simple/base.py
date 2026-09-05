@@ -116,6 +116,11 @@ class SimpleTool(BaseTool):
         """
         return {"readOnlyHint": True}
 
+    def supports_provider_native_continuation(self) -> bool:
+        """Simple model tools forward native conversation messages to providers."""
+
+        return True
+
     def format_response(self, response: str, request, model_info: Optional[dict] = None) -> str:
         """
         Format the AI response before returning to the client.
@@ -330,51 +335,58 @@ class SimpleTool(BaseTool):
 
             # Handle conversation history and prompt preparation
             if continuation_id:
-                # Check if conversation history is already embedded
-                field_value = self.get_request_prompt(request)
-                if "=== CONVERSATION HISTORY ===" in field_value:
-                    # Use pre-embedded history
-                    prompt = field_value
-                    logger.debug(f"{self.get_name()}: Using pre-embedded conversation history")
+                provider_messages = arguments.get("_provider_conversation_messages")
+                if provider_messages:
+                    # The server already persisted the current user turn and
+                    # reconstructed the provider-native message sequence.
+                    prompt = await self.prepare_prompt(request)
+                    logger.debug(f"{self.get_name()}: Using provider-native conversation history")
                 else:
-                    # No embedded history - reconstruct it (for in-process calls)
-                    logger.debug(f"{self.get_name()}: No embedded history found, reconstructing conversation")
+                    # Check if conversation history is already embedded.
+                    field_value = self.get_request_prompt(request)
+                    if "=== CONVERSATION HISTORY ===" in field_value:
+                        # Use pre-embedded history
+                        prompt = field_value
+                        logger.debug(f"{self.get_name()}: Using pre-embedded conversation history")
+                    else:
+                        # No embedded history - reconstruct it (for in-process calls)
+                        logger.debug(f"{self.get_name()}: No embedded history found, reconstructing conversation")
 
-                    # Get thread context
-                    from utils.conversation_memory import add_turn, build_conversation_history, get_thread
+                        # Get thread context
+                        from utils.conversation_memory import add_turn, build_conversation_history, get_thread
 
-                    thread_context = get_thread(continuation_id)
+                        thread_context = get_thread(continuation_id)
 
-                    if thread_context:
-                        # Add user's new input to conversation
-                        user_prompt = self.get_request_prompt(request)
-                        user_files = self.get_request_files(request)
-                        if user_prompt:
-                            add_turn(continuation_id, "user", user_prompt, files=user_files)
+                        if thread_context:
+                            # Add user's new input to conversation
+                            user_prompt = self.get_request_prompt(request)
+                            user_files = self.get_request_files(request)
+                            if user_prompt:
+                                add_turn(continuation_id, "user", user_prompt, files=user_files)
 
-                            # Get updated thread context after adding the turn
-                            thread_context = get_thread(continuation_id)
-                            logger.debug(
-                                f"{self.get_name()}: Retrieved updated thread with {len(thread_context.turns)} turns"
+                                # Get updated thread context after adding the turn
+                                thread_context = get_thread(continuation_id)
+                                logger.debug(
+                                    f"{self.get_name()}: Retrieved updated thread with {len(thread_context.turns)} turns"
+                                )
+
+                            # Build conversation history with updated thread context
+                            conversation_history, conversation_tokens = build_conversation_history(
+                                thread_context, self._model_context
                             )
 
-                        # Build conversation history with updated thread context
-                        conversation_history, conversation_tokens = build_conversation_history(
-                            thread_context, self._model_context
-                        )
+                            # Get the base prompt from the tool
+                            base_prompt = await self.prepare_prompt(request)
 
-                        # Get the base prompt from the tool
-                        base_prompt = await self.prepare_prompt(request)
-
-                        # Combine with conversation history
-                        if conversation_history:
-                            prompt = f"{conversation_history}\n\n=== NEW USER INPUT ===\n{base_prompt}"
+                            # Combine with conversation history
+                            if conversation_history:
+                                prompt = f"{conversation_history}\n\n=== NEW USER INPUT ===\n{base_prompt}"
+                            else:
+                                prompt = base_prompt
                         else:
-                            prompt = base_prompt
-                    else:
-                        # Thread not found, prepare normally
-                        logger.warning(f"Thread {continuation_id} not found, preparing prompt normally")
-                        prompt = await self.prepare_prompt(request)
+                            # Thread not found, prepare normally
+                            logger.warning(f"Thread {continuation_id} not found, preparing prompt normally")
+                            prompt = await self.prepare_prompt(request)
             else:
                 # New conversation, prepare prompt normally
                 prompt = await self.prepare_prompt(request)
@@ -448,6 +460,7 @@ class SimpleTool(BaseTool):
                 temperature=temperature,
                 thinking_mode=thinking_mode if supports_thinking else None,
                 images=images if images else None,
+                conversation_messages=arguments.get("_provider_conversation_messages"),
             )
 
             logger.info(f"Received response from {provider.get_provider_type().value} API for {self.get_name()}")
@@ -505,6 +518,7 @@ class SimpleTool(BaseTool):
                                 temperature=temperature,
                                 thinking_mode=thinking_mode if supports_thinking else None,
                                 images=images if images else None,
+                                conversation_messages=arguments.get("_provider_conversation_messages"),
                             )
 
                             if retry_response.content:
@@ -762,6 +776,8 @@ class SimpleTool(BaseTool):
             model_response = model_info.get("model_response")
             if model_response:
                 model_metadata = {"usage": model_response.usage, "metadata": model_response.metadata}
+                if model_response.provider_state:
+                    model_metadata["provider_state"] = model_response.provider_state
 
         add_turn(
             continuation_id,

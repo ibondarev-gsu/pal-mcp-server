@@ -227,6 +227,11 @@ class BaseTool(ABC):
         """
         return True
 
+    def supports_provider_native_continuation(self) -> bool:
+        """Return whether this execution path forwards native provider messages."""
+
+        return False
+
     def is_effective_auto_mode(self) -> bool:
         """
         Check if we're in effective auto mode for schema generation.

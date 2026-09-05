@@ -3,6 +3,7 @@
 from .azure_openai import AzureOpenAIProvider
 from .base import ModelProvider
 from .gemini import GeminiModelProvider
+from .kimi import KimiModelProvider
 from .openai import OpenAIModelProvider
 from .openai_compatible import OpenAICompatibleProvider
 from .openrouter import OpenRouterProvider
@@ -16,6 +17,7 @@ __all__ = [
     "ModelProviderRegistry",
     "AzureOpenAIProvider",
     "GeminiModelProvider",
+    "KimiModelProvider",
     "OpenAIModelProvider",
     "OpenAICompatibleProvider",
     "OpenRouterProvider",

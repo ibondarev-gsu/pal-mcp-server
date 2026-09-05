@@ -1,0 +1,34 @@
+{
+  "_README": {
+    "description": "Model metadata for direct Moonshot Kimi API access.",
+    "documentation": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+    "usage": "Set KIMI_API_KEY (or MOONSHOT_API_KEY). Override the endpoint with KIMI_BASE_URL when required.",
+    "field_notes": "Kimi K3 uses Chat Completions, fixed sampling parameters, top-level reasoning_effort, and exact assistant-message replay."
+  },
+  "models": [
+    {
+      "model_name": "kimi-k3",
+      "friendly_name": "Moonshot Kimi K3",
+      "aliases": [
+        "kimi",
+        "k3"
+      ],
+      "intelligence_score": 18,
+      "description": "Kimi K3 - native multimodal reasoning model for long-horizon coding and knowledge work",
+      "context_window": 1048576,
+      "max_output_tokens": 1048576,
+      "max_thinking_tokens": 0,
+      "supports_extended_thinking": true,
+      "supports_system_prompts": true,
+      "supports_streaming": true,
+      "supports_function_calling": true,
+      "supports_json_mode": true,
+      "supports_images": true,
+      "supports_temperature": false,
+      "use_openai_response_api": false,
+      "default_reasoning_effort": "max",
+      "allow_code_generation": true,
+      "max_image_size_mb": 20.0
+    }
+  ]
+}
