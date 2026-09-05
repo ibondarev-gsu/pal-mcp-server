@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from clink.models import ResolvedCLIRole
 from clink.parsers.base import ParserError
 
@@ -10,6 +12,8 @@ from .base import AgentOutput, BaseCLIAgent
 
 class ClaudeAgent(BaseCLIAgent):
     """Claude CLI agent with system-prompt injection support."""
+
+    injects_system_prompt_externally = True
 
     def _build_command(self, *, role: ResolvedCLIRole, system_prompt: str | None) -> list[str]:
         command = list(self.client.executable)
@@ -21,6 +25,17 @@ class ClaudeAgent(BaseCLIAgent):
 
         command.extend(role.role_args)
         return command
+
+    def _sanitize_command(self, command: Sequence[str]) -> list[str]:
+        sanitized = super()._sanitize_command(command)
+        try:
+            prompt_index = sanitized.index("--append-system-prompt") + 1
+            prompt = sanitized[prompt_index]
+        except (ValueError, IndexError):
+            return sanitized
+
+        sanitized[prompt_index] = f"[system prompt: {len(prompt)} chars]"
+        return sanitized
 
     def _recover_from_error(
         self,

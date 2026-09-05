@@ -20,6 +20,8 @@ from tools.shared.base_models import COMMON_FIELD_DESCRIPTIONS
 from tools.shared.exceptions import ToolExecutionError
 from tools.simple.base import SchemaBuilder, SimpleTool
 
+from .chat_widget import get_chat_widget_tool_meta
+
 logger = logging.getLogger(__name__)
 
 MAX_RESPONSE_CHARS = 20_000
@@ -45,6 +47,13 @@ class CLinkRequest(BaseModel):
     images: list[str] = Field(
         default_factory=list,
         description=COMMON_FIELD_DESCRIPTIONS["images"],
+    )
+    working_directory_absolute_path: str | None = Field(
+        default=None,
+        description=(
+            "Absolute path to an existing workspace directory the CLI agent may inspect. "
+            "Required for repository-aware Kimi reviews."
+        ),
     )
     continuation_id: str | None = Field(
         default=None,
@@ -78,12 +87,17 @@ class CLinkTool(SimpleTool):
 
     def get_description(self) -> str:
         return (
-            "Link a request to an external AI CLI (Gemini CLI, Qwen CLI, etc.) through PAL MCP to reuse "
-            "their capabilities inside existing workflows."
+            "Link a request to an external AI CLI (Kimi through Claude Code, Gemini, Codex, or Claude) "
+            "through PAL MCP so the external agent can inspect a workspace and return an independent result."
         )
 
     def get_annotations(self) -> dict[str, Any]:
-        return {"readOnlyHint": True}
+        return {"readOnlyHint": False}
+
+    def get_meta(self) -> dict[str, Any]:
+        """Attach the external-model response widget to clink calls."""
+
+        return get_chat_widget_tool_meta()
 
     def requires_model(self) -> bool:
         return False
@@ -142,6 +156,13 @@ class CLinkTool(SimpleTool):
             },
             "absolute_file_paths": SchemaBuilder.SIMPLE_FIELD_SCHEMAS["absolute_file_paths"],
             "images": SchemaBuilder.COMMON_FIELD_SCHEMAS["images"],
+            "working_directory_absolute_path": {
+                "type": "string",
+                "description": (
+                    "Absolute path to an existing workspace directory the CLI agent may inspect. "
+                    "Required for repository-aware Kimi reviews."
+                ),
+            },
             "continuation_id": SchemaBuilder.COMMON_FIELD_SCHEMAS["continuation_id"],
         }
 
@@ -183,6 +204,13 @@ class CLinkTool(SimpleTool):
         except KeyError as exc:
             self._raise_tool_error(str(exc))
 
+        agent = create_agent(client_config)
+        if agent.requires_explicit_working_dir and request.working_directory_absolute_path is None:
+            self._raise_tool_error(
+                f"CLI '{client_config.name}' requires 'working_directory_absolute_path' so it inspects the intended "
+                "workspace."
+            )
+
         absolute_file_paths = self.get_request_files(request)
         images = self.get_request_images(request)
         continuation_id = self.get_request_continuation_id(request)
@@ -190,7 +218,7 @@ class CLinkTool(SimpleTool):
         self._model_context = arguments.get("_model_context")
 
         system_prompt_text = role_config.prompt_path.read_text(encoding="utf-8")
-        include_system_prompt = not self._use_external_system_prompt(client_config)
+        include_system_prompt = not agent.injects_system_prompt_externally
 
         try:
             prompt_text = await self._prepare_prompt_for_role(
@@ -203,7 +231,6 @@ class CLinkTool(SimpleTool):
             logger.exception("Failed to prepare clink prompt")
             self._raise_tool_error(f"Failed to prepare prompt: {exc}")
 
-        agent = create_agent(client_config)
         try:
             result = await agent.run(
                 role=role_config,
@@ -211,6 +238,7 @@ class CLinkTool(SimpleTool):
                 system_prompt=system_prompt_text if system_prompt_text.strip() else None,
                 files=absolute_file_paths,
                 images=images,
+                working_dir=self._working_directory(request),
             )
         except CLIAgentError as exc:
             metadata = self._build_error_metadata(client_config, exc)
@@ -262,13 +290,41 @@ class CLinkTool(SimpleTool):
         client_config = self._registry.get_client(request.cli_name)
         role_config = client_config.get_role(request.role)
         system_prompt_text = role_config.prompt_path.read_text(encoding="utf-8")
-        include_system_prompt = not self._use_external_system_prompt(client_config)
+        include_system_prompt = not create_agent(client_config).injects_system_prompt_externally
         return await self._prepare_prompt_for_role(
             request,
             role_config,
             system_prompt=system_prompt_text,
             include_system_prompt=include_system_prompt,
         )
+
+    def _validate_file_paths(self, request: CLinkRequest) -> str | None:
+        error = super()._validate_file_paths(request)
+        if error:
+            return error
+
+        working_directory = request.working_directory_absolute_path
+        if working_directory is None:
+            return None
+
+        expanded = Path(working_directory).expanduser()
+        if not expanded.is_absolute():
+            return (
+                "Error: 'working_directory_absolute_path' must be an absolute path. " f"Received: {working_directory}"
+            )
+        if not expanded.is_dir():
+            return (
+                "Error: 'working_directory_absolute_path' must reference an existing directory. "
+                f"Received: {working_directory}"
+            )
+
+        request.working_directory_absolute_path = str(expanded.resolve())
+        return None
+
+    def _working_directory(self, request: CLinkRequest) -> Path | None:
+        if request.working_directory_absolute_path is None:
+            return None
+        return Path(request.working_directory_absolute_path)
 
     async def _prepare_prompt_for_role(
         self,
@@ -298,10 +354,6 @@ class CLinkTool(SimpleTool):
         finally:
             self._active_system_prompt = ""
 
-    def _use_external_system_prompt(self, client: ResolvedCLIClient) -> bool:
-        runner_name = (client.runner or client.name).lower()
-        return runner_name == "claude"
-
     def _build_success_metadata(
         self,
         client: ResolvedCLIClient,
@@ -316,6 +368,7 @@ class CLinkTool(SimpleTool):
             "duration_seconds": round(result.duration_seconds, 3),
             "parser": result.parser_name,
             "return_code": result.returncode,
+            "runner": client.runner or client.name,
         }
         metadata.update(result.parsed.metadata)
 
@@ -440,10 +493,9 @@ class CLinkTool(SimpleTool):
 
     def _agent_capabilities_guidance(self) -> str:
         return (
-            "You are operating through the Gemini CLI agent. You have access to your full suite of "
-            "CLI capabilities—including launching web searches, reading files, and using any other "
-            "available tools. Gather current information yourself and deliver the final answer without "
-            "asking the PAL MCP host to perform searches or file reads."
+            "You are operating through an external CLI agent. Use only the tools enabled for this invocation. "
+            "Inspect the workspace yourself when repository access is available, and deliver the final answer "
+            "without asking the PAL MCP host to perform file reads."
         )
 
     def _format_file_references(self, files: list[str]) -> str:

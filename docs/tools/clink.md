@@ -23,7 +23,7 @@ The subagent:
 - Returns **only the final security report** (not intermediate steps)
 - Your main session stays **laser-focused** on debugging
 
-**Works with any supported CLI**: Codex can spawn Codex / Claude Code / Gemini CLI subagents, or mix and match between different CLIs.
+**Works with any supported CLI**: Codex can spawn Kimi through Claude Code, Codex, Claude Code, or Gemini CLI subagents, and mix results between them.
 
 ---
 
@@ -52,6 +52,7 @@ Gemini receives the full conversation context from `consensus` including the con
 - **Full conversation continuity**: Gemini's responses participate in the same conversation thread
 - **Role-based prompts**: Pre-configured roles for planning, code review, or general questions
 - **Full CLI capabilities**: Gemini can use its own web search, file tools, and latest features
+- **Repository-aware Kimi review**: the `kimi` preset runs Kimi K3 through Claude Code with read-only `Read`, `Glob`, and `Grep` tools
 - **Token efficiency**: File references (not full content) to conserve tokens
 - **Cross-tool collaboration**: Combine with other PAL tools like `planner` → `clink` → `codereview`
 - **Free tier available**: Gemini offers 1,000 requests/day free with a personal Google account - great for cost savings across tools
@@ -78,10 +79,11 @@ You can make your own custom roles in `conf/cli_clients/` or tweak any of the sh
 ## Tool Parameters
 
 - `prompt`: Your question or task for the external CLI (required)
-- `cli_name`: Which CLI to use - `gemini` (default), `claude`, `codex`, or add your own in `conf/cli_clients/`
+- `cli_name`: Which CLI to use - `kimi`, `gemini` (default), `claude`, `codex`, or add your own in `conf/cli_clients/`
 - `role`: Preset role - `default`, `planner`, `codereviewer` (default: `default`)
 - `files`: Optional file paths for context (references only, CLI opens files itself)
 - `images`: Optional image paths for visual context
+- `working_directory_absolute_path`: Existing absolute workspace directory used as the CLI agent's process root
 - `continuation_id`: Continue previous clink conversations
 
 ## Usage Examples
@@ -138,11 +140,18 @@ then codereview to verify the implementation"
 
 Clink configurations live in `conf/cli_clients/`. We ship presets for the supported CLIs:
 
+- `kimi.json` – runs Claude Code against Kimi Code's Anthropic-compatible endpoint with read-only repository tools
 - `gemini.json` – runs `gemini --telemetry false --yolo -o json`
 - `claude.json` – runs `claude --print --output-format json --permission-mode acceptEdits --model sonnet`
 - `codex.json` – runs `codex exec --json --dangerously-bypass-approvals-and-sandbox`
 
 > **CAUTION**: These flags intentionally bypass each CLI's safety prompts so they can edit files or launch tools autonomously via MCP. Only enable them in trusted sandboxes and tailor role prompts or CLI configs if you need more guardrails.
+
+The `kimi` preset is the exception: it uses `--bare --permission-mode plan`
+and restricts Claude Code to `Read,Glob,Grep`. It reads its credential from
+`KIMI_CLAUDE_API_KEY`, falling back to `KIMI_API_KEY`, and never places the key
+in command-line arguments. Kimi documents this Claude Code integration at
+<https://www.kimi.com/code/docs/en/third-party-tools/claude-code.html>.
 
 Each preset points to role-specific prompts in `systemprompts/clink/`. Duplicate those files to add more roles or adjust CLI flags.
 
@@ -162,6 +171,7 @@ Each preset points to role-specific prompts in `systemprompts/clink/`. Duplicate
 Ensure the relevant CLI is installed and configured:
 
 - [Claude Code](https://www.anthropic.com/claude-code)
+- A Kimi Code Console API key when using `cli_name=kimi`
 - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 - [Codex CLI](https://docs.sourcegraph.com/codex)
 

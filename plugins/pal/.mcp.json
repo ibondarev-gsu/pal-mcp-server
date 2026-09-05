@@ -7,6 +7,8 @@
       "env_vars": [
         "HOME",
         "PATH",
+        "PAL_MCP_SOURCE",
+        "KIMI_CLAUDE_API_KEY",
         "KIMI_API_KEY",
         "MOONSHOT_API_KEY",
         "KIMI_BASE_URL",
