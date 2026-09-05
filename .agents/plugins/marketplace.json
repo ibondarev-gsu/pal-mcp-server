@@ -1,0 +1,20 @@
+{
+  "name": "pal-mcp",
+  "interface": {
+    "displayName": "PAL MCP"
+  },
+  "plugins": [
+    {
+      "name": "pal",
+      "source": {
+        "source": "local",
+        "path": "./plugins/pal"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

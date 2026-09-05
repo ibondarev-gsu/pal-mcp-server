@@ -208,7 +208,9 @@ state across PAL continuations and maps PAL thinking modes to K3's `low`, `high`
 `max` reasoning levels.
 
 For a second-machine Codex installation, follow the
-[Kimi K3 quick setup](docs/kimi-codex-setup.md).
+[Kimi K3 plugin setup](docs/kimi-codex-setup.md). The plugin installs the PAL
+MCP tools and the bundled `$pal` skill together; invoke `$pal` explicitly when
+you want Codex to consult Kimi.
 
 ## Core Tools
 

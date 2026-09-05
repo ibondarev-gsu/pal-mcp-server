@@ -1,0 +1,39 @@
+{
+  "name": "pal",
+  "version": "0.1.0",
+  "description": "Use PAL with Kimi K3 as an independent software-development reviewer in Codex.",
+  "author": {
+    "name": "ibondarev-gsu",
+    "url": "https://github.com/ibondarev-gsu"
+  },
+  "homepage": "https://github.com/ibondarev-gsu/pal-mcp-server",
+  "repository": "https://github.com/ibondarev-gsu/pal-mcp-server",
+  "license": "MIT",
+  "keywords": [
+    "pal",
+    "kimi",
+    "mcp",
+    "code-review"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "PAL + Kimi",
+    "shortDescription": "Independent review through Kimi K3",
+    "longDescription": "Adds the PAL MCP tools, the interactive chat result card, and the $pal skill for architecture, code review, debugging, security, testing, and planning.",
+    "developerName": "ibondarev-gsu",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Code review",
+      "External model"
+    ],
+    "websiteURL": "https://github.com/ibondarev-gsu/pal-mcp-server",
+    "defaultPrompt": [
+      "Use $pal to review this change with Kimi K3.",
+      "Use $pal to challenge this implementation plan.",
+      "Use $pal to debug this failure with Kimi K3."
+    ],
+    "brandColor": "#6657D9"
+  },
+  "mcpServers": "./.mcp.json"
+}

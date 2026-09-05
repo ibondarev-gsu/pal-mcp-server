@@ -120,6 +120,12 @@ def is_dangerous_path(path: Path) -> bool:
     """
     try:
         resolved = path.resolve()
+        path_variants = {resolved}
+        if path.is_absolute():
+            # Keep the lexical path as well as the symlink-resolved target. A
+            # path below /usr must remain blocked even when its final symlink
+            # target lives outside /usr (common on macOS).
+            path_variants.add(path.absolute())
 
         def _dangerous_variants(p: Path) -> set[Path]:
             variants = {p}
@@ -146,15 +152,16 @@ def is_dangerous_path(path: Path) -> bool:
                 # is_relative_to() correctly handles both exact matches and subdirectories.
                 # Resolving the dangerous base path also handles platform symlinks
                 # (e.g., macOS /etc -> /private/etc, /var -> /private/var).
-                if resolved == dangerous_path or resolved.is_relative_to(dangerous_path):
-                    return True
+                for candidate in path_variants:
+                    if candidate == dangerous_path or candidate.is_relative_to(dangerous_path):
+                        return True
 
         # Check 3: Home containers - block ONLY exact match
         # Subdirectories like /home/user/project should pass through here
         # and be handled by is_home_directory_root() in resolve_and_validate_path()
         for container in DANGEROUS_HOME_CONTAINERS:
             for container_path in _dangerous_variants(Path(container)):
-                if resolved == container_path:
+                if any(candidate == container_path for candidate in path_variants):
                     return True
 
         return False

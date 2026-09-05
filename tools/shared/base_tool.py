@@ -215,6 +215,11 @@ class BaseTool(ABC):
         """
         return None
 
+    def get_meta(self) -> Optional[dict[str, Any]]:
+        """Return optional MCP tool metadata, including MCP Apps UI links."""
+
+        return None
+
     def requires_model(self) -> bool:
         """
         Return whether this tool requires AI model access.
